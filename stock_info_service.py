@@ -28,6 +28,7 @@ class StockInfoService(CommonService):
             "url": None,
             "summary": {},
             "chart_data": [],
+            "chart_data_day": [],
             "formated_context": ""
         }
 
@@ -58,7 +59,6 @@ class StockInfoService(CommonService):
                     "status": 404
                 })
                 return response
-
             response["url"] = url
 
             # 3) Fetch & parse HTML
@@ -77,7 +77,7 @@ class StockInfoService(CommonService):
             if el_price:
                 try:
                     last_price = float(el_price.text.replace(",", ""))
-                except Exception:
+                except:
                     pass
             response["last_price"] = last_price
 
@@ -103,8 +103,8 @@ class StockInfoService(CommonService):
             el_date = row.select_one("div#tradedate")
             if el_date:
                 dt_txt = el_date.get_text(strip=True)
-                dt = datetime.strptime(dt_txt, "%d/%m/%Y %H:%M")
-                trading_date = dt_txt  # hoặc str(int(dt.timestamp()*1000)) nếu cần epoch
+                datetime.strptime(dt_txt, "%d/%m/%Y %H:%M")
+                trading_date = dt_txt
             response["trading_date"] = trading_date
 
             # — trading_status_name —
@@ -127,22 +127,28 @@ class StockInfoService(CommonService):
                 if not b:
                     continue
                 value = b.get_text(strip=True)
-                # Lấy key là phần text trước <b>
                 key = p.get_text("|||", strip=True).split("|||")[0].strip(": ")
                 summary[key] = value
             response["summary"] = summary
 
-            # 6) Lấy dữ liệu biểu đồ 12 tháng
-            chart_url = "https://finance.vietstock.vn/data/getstockdealdetailbytime"
+            # Prepare session & token
             stock_url = f"https://finance.vietstock.vn/{symbol}-ctcp-{symbol.lower()}.htm"
             session = requests.Session()
-            get_headers = {"User-Agent": "Mozilla/5.0"}
-            r = session.get(stock_url, headers=get_headers)
+            session.headers.update({"User-Agent": "Mozilla/5.0"})
+            r = session.get(stock_url)
             r.raise_for_status()
             soup = BeautifulSoup(r.text, "html.parser")
             token_input = soup.find("input", {"name": "__RequestVerificationToken"})
-            token = token_input["value"] if token_input else session.cookies.get_dict().get("__RequestVerificationToken", "")
+            token = token_input["value"] if token_input else session.cookies.get("__RequestVerificationToken", "")
             cookies = session.cookies.get_dict()
+            post_headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "X-Requested-With": "XMLHttpRequest",
+                "Cookie": "; ".join(f"{k}={v}" for k, v in cookies.items())
+            
+
+            # 6) Lấy dữ liệu biểu đồ 12 tháng
+            chart_url = "https://finance.vietstock.vn/data/getstockdealdetailbytime"
             chart_payload = {
                 "code": symbol,
                 "seq": 0,
@@ -150,27 +156,55 @@ class StockInfoService(CommonService):
                 "tradingDate": "",
                 "__RequestVerificationToken": token
             }
-            post_headers = {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "User-Agent": "Mozilla/5.0",
-                "X-Requested-With": "XMLHttpRequest",
-                "Cookie": "; ".join([f"{k}={v}" for k, v in cookies.items()])
-            }
             cj = session.post(chart_url, data=chart_payload, headers=post_headers)
             cj.raise_for_status()
             chart_js = cj.json()
             data = chart_js if isinstance(chart_js, list) else chart_js.get("Data", [])
-            # Format lại TradingDate
+            # Format & trim chart_data
             for d in data:
-                if "TradingDate" in d and d["TradingDate"].startswith("/Date("):
-                    try:
-                        ts = int(d["TradingDate"].split("(")[1].split(")")[0]) // 1000
-                        d["TradingDate"] = datetime.fromtimestamp(ts).strftime("%d/%m/%Y")
-                    except:
-                        pass
+                if d.get("TradingDate", "").startswith("/Date("):
+                    ts = int(d["TradingDate"].split("(")[1].split(")")[0]) // 1000
+                    d["TradingDate"] = datetime.fromtimestamp(ts).strftime("%d/%m/%Y")
+                for k in ("Min", "Max", "Package", "Timetype", "TradingDateStr"):
+                    d.pop(k, None)
             response["chart_data"] = data
 
-            # 6.5) Tạo formated_context tổng hợp (trừ chart_data)
+            # 6.1) Lấy dữ liệu biểu đồ ngày
+            daily_chart_url = "https://finance.vietstock.vn/data/getstockdealdetailchart"
+            daily_payload = {
+                "code": symbol,
+                "interval": 1,
+                "__RequestVerificationToken": token
+            }
+            dj = session.post(daily_chart_url, data=daily_payload, headers=post_headers)
+            dj.raise_for_status()
+            daily_js = dj.json()
+            daily_data = daily_js if isinstance(daily_js, list) else daily_js.get("Data", [])
+            # Format & trim chart_data_day
+            for d in daily_data:
+                raw = d.get("TradingDate", "")
+                if raw.startswith("/Date(") and raw.endswith(")/"):
+                    ms = int(raw[6:-2])
+                    dt = datetime.fromtimestamp(ms / 1000)
+                    d["TradingDateStr"] = dt.strftime("%Y-%m-%d %H:%M:%S")
+                else:
+                    d["TradingDateStr"] = None
+                # Xóa các trường không mong muốn
+                for k in ("isBuy", "IsBuy", "stockcode", "StockCode", "Stockcode", "TradingDate", "Package", "TotalVal", "TotalVol"):
+                    d.pop(k, None)
+            response["chart_data_day"] = daily_data
+
+            # 7) Tạo formated_context (không bao gồm chart_data_day)
+            #    Sắp xếp chart_data theo ngày giảm dần
+            sorted_chart = []
+            for d in response["chart_data"]:
+                try:
+                    dt = datetime.strptime(d["TradingDate"], "%d/%m/%Y")
+                except:
+                    dt = datetime.min
+                sorted_chart.append((dt, d))
+            sorted_chart.sort(key=lambda x: x[0], reverse=True)
+
             parts = [
                 f"Mã cổ phiếu: {response['stock_code']}",
                 f"Tên đầy đủ: {response['full_name']}",
@@ -181,11 +215,12 @@ class StockInfoService(CommonService):
             ]
             for key, val in response["summary"].items():
                 parts.append(f"{key}: {val}")
+            # Thêm chart_data (1 năm) từ gần nhất
+            for _, d in sorted_chart:
+                parts.append(f"{d['TradingDate']}: Price {d.get('Price')} - Vol {d.get('Vol')}")
+
             response["formated_context"] = "; ".join(parts)
-
-            # 7) Đổ message
             response["message"] = "Success!"
-
         except Exception as e:
             log.error(traceback.format_exc())
             response.update({"message": str(e), "status": 500})

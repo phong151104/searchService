@@ -98,6 +98,30 @@ def process_data():
     app.logger.debug("Response: %s", response)
     return jsonify(response), response.get("status", 200)
 
+@app.route("/search/lottery", methods=["POST"])
+def lottery():
+    app.logger.debug("\n\nInput: %s", request.json)
+    service = ServiceFactory().get_lottery_service()
+    response = service.process(json_data=request.json, log=app.logger)
+    app.logger.debug("Response: %s", response)
+    return jsonify(response), response.get("status", 200)
+
+@app.route("/search/lottery-monthly-stats", methods=["POST"])
+def lottery_monthly_stats():
+    app.logger.debug("\n\nInput: %s", request.json)
+    service = ServiceFactory().get_lottery_monthly_stats_service()
+    response = service.process(json_data=request.json, log=app.logger)
+    app.logger.debug("Response: %s", response)
+    return jsonify(response), response.get("status", 200)
+
+@app.route("/search/dream-lottery", methods=["POST"])
+def dream_lottery():
+    app.logger.debug("\n\nInput: %s", request.json)
+    service = ServiceFactory().get_dream_lottery_service()
+    response = service.process(json_data=request.json, log=app.logger)
+    app.logger.debug("Response: %s", response)
+    return jsonify(response), response.get("status", 200)
+
 @app.route('/api/translate', methods=['POST'])
 def translate_text():
     try:

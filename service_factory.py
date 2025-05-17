@@ -7,10 +7,13 @@ from football_schedule_service import FootballScheduleService
 from stock_quote_service import StockQuoteService
 from search_all_service import SearchAllService
 from stock_info_service import StockInfoService
-from gold_format_service import GoldFormatService
+from gold_format_service import GoldPriceService
 from movie_info_service import MovieInfoService
 from wiki_search import WikiSearchService
 from data_process_service import DataProcessService
+from lottery_service import LotteryService
+from lottery_monthly_stats_service import LotteryMonthlyStatsService
+from dream_lottery_service import DreamLotteryService
 
 class ServiceFactory:
     def __init__(self):
@@ -61,11 +64,11 @@ class ServiceFactory:
         self.dic[key] = StockInfoService()
         return self.dic[key]
     
-    def get_gold_format_service(self) -> GoldFormatService:
-        key = GoldFormatService.service_name
+    def get_gold_format_service(self) -> GoldPriceService:
+        key = GoldPriceService.service_name
         if key in self.dic:
             return self.dic[key]
-        self.dic[key] = GoldFormatService()
+        self.dic[key] = GoldPriceService()
         return self.dic[key]
     
     def get_movie_info_service(self) -> MovieInfoService:
@@ -87,6 +90,27 @@ class ServiceFactory:
         if key in self.dic:
             return self.dic[key]
         self.dic[key] = DataProcessService()
+        return self.dic[key]
+    
+    def get_lottery_service(self) -> LotteryService:
+        key = LotteryService.service_name
+        if key in self.dic:
+            return self.dic[key]
+        self.dic[key] = LotteryService()
+        return self.dic[key]
+    
+    def get_lottery_monthly_stats_service(self) -> LotteryMonthlyStatsService:
+        key = LotteryMonthlyStatsService.service_name
+        if key in self.dic:
+            return self.dic[key]
+        self.dic[key] = LotteryMonthlyStatsService()
+        return self.dic[key]
+    
+    def get_dream_lottery_service(self) -> DreamLotteryService:
+        key = DreamLotteryService.service_name
+        if key in self.dic:
+            return self.dic[key]
+        self.dic[key] = DreamLotteryService()
         return self.dic[key]
     
     
