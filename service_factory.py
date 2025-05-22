@@ -14,6 +14,7 @@ from data_process_service import DataProcessService
 from lottery_service import LotteryService
 from lottery_monthly_stats_service import LotteryMonthlyStatsService
 from dream_lottery_service import DreamLotteryService
+from calendar_service import CalendarService
 
 class ServiceFactory:
     def __init__(self):
@@ -112,6 +113,22 @@ class ServiceFactory:
             return self.dic[key]
         self.dic[key] = DreamLotteryService()
         return self.dic[key]
+    
+    def get_calendar_service(self) -> CalendarService:
+        key = CalendarService.service_name
+        if key in self.dic:
+            return self.dic[key]
+        self.dic[key] = CalendarService()
+        return self.dic[key]
+    
+    @staticmethod
+    def get_service(service_name):
+        if service_name == "gold_price_service":
+            return GoldPriceService()
+        elif service_name == "calendar_service":
+            return CalendarService()
+        else:
+            raise ValueError(f"Unknown service: {service_name}")
     
     
 

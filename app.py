@@ -5,8 +5,19 @@ os.environ['SERPAPI_API_KEY'] = 'e8e87504a12a592d143c4280e8ac79c15f4ee36f22e3dee
 from flask import Flask, request, jsonify
 from service_factory import ServiceFactory
 # from common_service.translation_service import TranslationService
+from gold_format_service import GoldPriceService
+from calendar_service import CalendarService
+from selenium.webdriver.support.ui import Select
+from selenium.webdriver.common.by import By
 
 app = Flask(__name__)
+
+def handle_request(service, request):
+    """Handle request for services"""
+    app.logger.debug("\n\nInput: %s", request.json)
+    response = service.process(json_data=request.json, log=app.logger)
+    app.logger.debug("Response: %s", response)
+    return jsonify(response), response.get("status", 200)
 
 @app.route("/search/movie", methods=["POST"])
 def movie():
@@ -144,6 +155,26 @@ def translate_text():
             "status": "error",
             "message": str(e)
         }), 500
+
+@app.route("/api/gold", methods=["POST"])
+def gold_price():
+    return handle_request(GoldPriceService(), request)
+
+@app.route("/search/calendar", methods=["POST"])
+def calendar():
+    app.logger.debug("\n\nInput: %s", request.json)
+    service = ServiceFactory().get_calendar_service()
+    response = service.process(json_data=request.json, log=app.logger)
+    app.logger.debug("Response: %s", response)
+    return jsonify(response), response.get("status", 200)
+
+@app.route("/search/calendar-convert", methods=["POST"])
+def calendar_convert():
+    app.logger.debug("\n\nInput: %s", request.json)
+    service = ServiceFactory().get_calendar_convert_service()
+    response = service.process_convert(json_data=request.json, log=app.logger)
+    app.logger.debug("Response: %s", response)
+    return jsonify(response), response.get("status", 200)
 
 if __name__ == "__main__":
     # Chạy app ở chế độ debug để dễ theo dõi log

@@ -145,7 +145,7 @@ class StockInfoService(CommonService):
                 "Content-Type": "application/x-www-form-urlencoded",
                 "X-Requested-With": "XMLHttpRequest",
                 "Cookie": "; ".join(f"{k}={v}" for k, v in cookies.items())
-            
+            }
 
             # 6) Lấy dữ liệu biểu đồ 12 tháng
             chart_url = "https://finance.vietstock.vn/data/getstockdealdetailbytime"
