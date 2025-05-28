@@ -4,11 +4,6 @@ os.environ['SERPAPI_API_KEY'] = 'e8e87504a12a592d143c4280e8ac79c15f4ee36f22e3dee
 
 from flask import Flask, request, jsonify
 from service_factory import ServiceFactory
-# from common_service.translation_service import TranslationService
-from gold_format_service import GoldPriceService
-from calendar_service import CalendarService
-from selenium.webdriver.support.ui import Select
-from selenium.webdriver.common.by import By
 
 app = Flask(__name__)
 
@@ -71,7 +66,7 @@ def stock_quote():
 
 @app.route("/search/stockInfo", methods=["POST"])
 def stock_info():
-    app.logger.debug("Input: %s", request.json)
+    app.logger.debug("\n\nInput: %s", request.json)
     service = ServiceFactory().get_stock_info_service()
     response = service.process(json_data=request.json, log=app.logger)
     app.logger.debug("Response: %s", response)
@@ -133,6 +128,22 @@ def dream_lottery():
     app.logger.debug("Response: %s", response)
     return jsonify(response), response.get("status", 200)
 
+@app.route("/search/cgv_now_showing", methods=["POST"])
+def cgv_now_showing():
+    app.logger.debug("\n\nInput: %s", request.json)
+    service = ServiceFactory().get_cgv_now_showing_service()
+    response = service.process(json_data=request.json, log=app.logger)
+    app.logger.debug("Response: %s", response)
+    return jsonify(response), response.get("status", 200)
+
+@app.route("/search/tuvi", methods=["POST"])
+def tuvi():
+    app.logger.debug("\n\nInput: %s", request.json)
+    service = ServiceFactory().get_tuvi_service()
+    response = service.process(json_data=request.json, log=app.logger)
+    app.logger.debug("Response: %s", response)
+    return jsonify(response), response.get("status", 200)
+
 @app.route('/api/translate', methods=['POST'])
 def translate_text():
     try:
@@ -168,11 +179,11 @@ def calendar():
     app.logger.debug("Response: %s", response)
     return jsonify(response), response.get("status", 200)
 
-@app.route("/search/calendar-convert", methods=["POST"])
-def calendar_convert():
+@app.route("/search/google_image", methods=["POST"])
+def google_image():
     app.logger.debug("\n\nInput: %s", request.json)
-    service = ServiceFactory().get_calendar_convert_service()
-    response = service.process_convert(json_data=request.json, log=app.logger)
+    service = ServiceFactory().get_google_image_service()
+    response = service.process(json_data=request.json, log=app.logger)
     app.logger.debug("Response: %s", response)
     return jsonify(response), response.get("status", 200)
 

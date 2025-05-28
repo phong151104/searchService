@@ -15,6 +15,9 @@ from lottery_service import LotteryService
 from lottery_monthly_stats_service import LotteryMonthlyStatsService
 from dream_lottery_service import DreamLotteryService
 from calendar_service import CalendarService
+from tuvi_service import TuViService
+from google_image_service import GoogleImageService
+from cgv_now_showing_service import CGVNowShowingService
 
 class ServiceFactory:
     def __init__(self):
@@ -121,6 +124,28 @@ class ServiceFactory:
         self.dic[key] = CalendarService()
         return self.dic[key]
     
+    def get_tuvi_service(self):
+        key = TuViService.service_name
+        if key in self.dic:
+            return self.dic[key]
+        self.dic[key] = TuViService()
+        return self.dic[key]
+    
+    def get_google_image_service(self) -> GoogleImageService:
+        key = GoogleImageService.service_name
+        if key in self.dic:
+            return self.dic[key]
+        self.dic[key] = GoogleImageService()
+        return self.dic[key]
+    
+    def get_cgv_now_showing_service(self):
+        key = CGVNowShowingService.service_name
+        if key in self.dic:
+            return self.dic[key]
+        self.dic[key] = CGVNowShowingService()
+        return self.dic[key]
+
+
     @staticmethod
     def get_service(service_name):
         if service_name == "gold_price_service":

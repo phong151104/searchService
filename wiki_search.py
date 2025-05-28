@@ -54,9 +54,10 @@ class WikiSearchService(CommonService):
                 html = self.get_html_content(item["title"])
                 # merged["html"] = html
                 merged["html_cleaned"] = self.clean_html_content(html)
-                # Parse HTML để lấy đoạn văn đầu và bảng
+                # Parse HTML để lấy đoạn văn đầu, bảng và ảnh đại diện
                 parsed = self.parse_html_content(html)
                 merged["first_paragraph"] = parsed["first_paragraph"]
+                merged["infobox_img_url"] = parsed.get("infobox_img_url", "")
                 # merged["tables"] = parsed["tables"]
                 full_results.append(merged)
 
@@ -168,10 +169,24 @@ class WikiSearchService(CommonService):
         # Lấy đoạn văn đầu tiên (không nằm trong infobox)
         first_paragraph = ""
         for p in soup.select(".mw-parser-output > p"):
-            text = p.get_text(strip=True)
+            text = p.get_text(separator=' ', strip=True)
             if text:
                 first_paragraph = text
                 break
+
+        # Lấy ảnh đầu tiên trong infobox (nếu có)
+        infobox_img_url = ""
+        infobox = soup.select_one(".mw-parser-output > table.infobox")
+        if infobox:
+            img = infobox.find("img")
+            if img and img.get("src"):
+                src = img["src"]
+                if src.startswith("//"):
+                    infobox_img_url = "https:" + src
+                elif src.startswith("http"):
+                    infobox_img_url = src
+                else:
+                    infobox_img_url = "https://vi.wikipedia.org" + src
 
         # Lấy tất cả các bảng (dưới dạng HTML)
         tables = []
@@ -180,7 +195,8 @@ class WikiSearchService(CommonService):
 
         return {
             "first_paragraph": first_paragraph,
-            "tables": tables
+            "tables": tables,
+            "infobox_img_url": infobox_img_url
         }
 
     def clean_html_content(self, html):

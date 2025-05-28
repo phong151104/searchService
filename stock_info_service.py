@@ -42,7 +42,14 @@ class StockInfoService(CommonService):
             symbol = query.split()[-1].upper()
             response["stock_code"] = symbol
 
-            # 2) Lấy URL chi tiết từ serp
+            # ---- Đọc min_date, max_date ở định dạng DD/MM/YYYY ----
+            min_date_str = (json_data.get("min_date") or "").strip()
+            max_date_str = (json_data.get("max_date") or "").strip()
+            min_dt = datetime.strptime(min_date_str, "%d/%m/%Y") if min_date_str else None
+            max_dt = datetime.strptime(max_date_str, "%d/%m/%Y") if max_date_str else None
+            # -------------------------------------------------------
+
+            # 2) Lấy URL chi tiết từ SERP
             raw_results = self.serp.search(message=query, num_results=1)
             if not raw_results:
                 response.update({
@@ -98,11 +105,12 @@ class StockInfoService(CommonService):
             response["change"] = change
             response["per_change"] = per_change
 
-            # — trading_date —
+            # — trading_date (DD/MM/YYYY HH:MM) —
             trading_date = None
             el_date = row.select_one("div#tradedate")
             if el_date:
-                dt_txt = el_date.get_text(strip=True)
+                dt_txt = el_date.get_text(strip=True)  # ví dụ "17/05/2025 15:30"
+                # kiểm tra đúng định dạng
                 datetime.strptime(dt_txt, "%d/%m/%Y %H:%M")
                 trading_date = dt_txt
             response["trading_date"] = trading_date
@@ -131,7 +139,7 @@ class StockInfoService(CommonService):
                 summary[key] = value
             response["summary"] = summary
 
-            # Prepare session & token
+            # 6) Lấy dữ liệu biểu đồ 12 tháng
             stock_url = f"https://finance.vietstock.vn/{symbol}-ctcp-{symbol.lower()}.htm"
             session = requests.Session()
             session.headers.update({"User-Agent": "Mozilla/5.0"})
@@ -147,7 +155,6 @@ class StockInfoService(CommonService):
                 "Cookie": "; ".join(f"{k}={v}" for k, v in cookies.items())
             }
 
-            # 6) Lấy dữ liệu biểu đồ 12 tháng
             chart_url = "https://finance.vietstock.vn/data/getstockdealdetailbytime"
             chart_payload = {
                 "code": symbol,
@@ -159,15 +166,39 @@ class StockInfoService(CommonService):
             cj = session.post(chart_url, data=chart_payload, headers=post_headers)
             cj.raise_for_status()
             chart_js = cj.json()
-            data = chart_js if isinstance(chart_js, list) else chart_js.get("Data", [])
-            # Format & trim chart_data
-            for d in data:
+            orig_data = chart_js if isinstance(chart_js, list) else chart_js.get("Data", [])
+
+            # Format & trim chart_data (TradingDate → DD/MM/YYYY)
+            for d in orig_data:
                 if d.get("TradingDate", "").startswith("/Date("):
                     ts = int(d["TradingDate"].split("(")[1].split(")")[0]) // 1000
                     d["TradingDate"] = datetime.fromtimestamp(ts).strftime("%d/%m/%Y")
                 for k in ("Min", "Max", "Package", "Timetype", "TradingDateStr"):
                     d.pop(k, None)
-            response["chart_data"] = data
+
+            # --- Lọc chart_data theo khoảng ngày nếu có ---
+            filtered = orig_data
+            if min_dt or max_dt:
+                filtered = []
+                for d in orig_data:
+                    try:
+                        dt = datetime.strptime(d["TradingDate"], "%d/%m/%Y")
+                    except:
+                        continue
+                    if (min_dt is None or dt >= min_dt) and (max_dt is None or dt <= max_dt):
+                        filtered.append(d)
+                # nếu rỗng và chỉ hỏi 1 ngày duy nhất → fallback nearest
+                if not filtered and min_dt and max_dt and min_dt == max_dt:
+                    target = min_dt
+                    closest = min(
+                        orig_data,
+                        key=lambda d: abs(
+                            datetime.strptime(d["TradingDate"], "%d/%m/%Y") - target
+                        )
+                    )
+                    filtered = [closest]
+            response["chart_data"] = filtered
+            # -----------------------------------------------------
 
             # 6.1) Lấy dữ liệu biểu đồ ngày
             daily_chart_url = "https://finance.vietstock.vn/data/getstockdealdetailchart"
@@ -180,22 +211,27 @@ class StockInfoService(CommonService):
             dj.raise_for_status()
             daily_js = dj.json()
             daily_data = daily_js if isinstance(daily_js, list) else daily_js.get("Data", [])
-            # Format & trim chart_data_day
+
+            # Format & trim chart_data_day (TradingDateStr → DD/MM/YYYY HH:MM:SS)
             for d in daily_data:
                 raw = d.get("TradingDate", "")
                 if raw.startswith("/Date(") and raw.endswith(")/"):
                     ms = int(raw[6:-2])
                     dt = datetime.fromtimestamp(ms / 1000)
-                    d["TradingDateStr"] = dt.strftime("%Y-%m-%d %H:%M:%S")
+                    d["TradingDate"] = dt.strftime("%d/%m/%Y %H:%M:%S")
                 else:
-                    d["TradingDateStr"] = None
-                # Xóa các trường không mong muốn
-                for k in ("isBuy", "IsBuy", "stockcode", "StockCode", "Stockcode", "TradingDate", "Package", "TotalVal", "TotalVol"):
+                    d["TradingDate"] = None
+                if "TradingDateStr" in d:
+                    d.pop("TradingDateStr")
+                for k in (
+                    "isBuy", "IsBuy", "stockcode", "StockCode",
+                    "Stockcode", "Package",
+                    "TotalVal", "TotalVol"
+                ):
                     d.pop(k, None)
             response["chart_data_day"] = daily_data
 
             # 7) Tạo formated_context (không bao gồm chart_data_day)
-            #    Sắp xếp chart_data theo ngày giảm dần
             sorted_chart = []
             for d in response["chart_data"]:
                 try:
@@ -215,7 +251,6 @@ class StockInfoService(CommonService):
             ]
             for key, val in response["summary"].items():
                 parts.append(f"{key}: {val}")
-            # Thêm chart_data (1 năm) từ gần nhất
             for _, d in sorted_chart:
                 parts.append(f"{d['TradingDate']}: Price {d.get('Price')} - Vol {d.get('Vol')}")
 
