@@ -8,7 +8,7 @@ class GoogleMapsService(CommonService):
     
     def __init__(self):
         super(GoogleMapsService, self).__init__()
-        self.api_key = "AIzaSyDF8uhq0FlMcyarxFpsShnMqs7j_nCfAM4"
+        self.api_key = ""
         self.base_url = "https://routes.googleapis.com/directions/v2"
         self.places_url = "https://places.googleapis.com/v1"
         
