@@ -18,6 +18,7 @@ from calendar_service import CalendarService
 from tuvi_service import TuViService
 from google_image_service import GoogleImageService
 from cgv_now_showing_service import CGVNowShowingService
+from google_maps_service import GoogleMapsService
 
 class ServiceFactory:
     def __init__(self):
@@ -145,6 +146,12 @@ class ServiceFactory:
         self.dic[key] = CGVNowShowingService()
         return self.dic[key]
 
+    def get_google_maps_service(self) -> GoogleMapsService:
+        key = GoogleMapsService.service_name
+        if key in self.dic:
+            return self.dic[key]
+        self.dic[key] = GoogleMapsService()
+        return self.dic[key]
 
     @staticmethod
     def get_service(service_name):
@@ -152,6 +159,8 @@ class ServiceFactory:
             return GoldPriceService()
         elif service_name == "calendar_service":
             return CalendarService()
+        elif service_name == "google_maps_service":
+            return GoogleMapsService()
         else:
             raise ValueError(f"Unknown service: {service_name}")
     
