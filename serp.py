@@ -2,6 +2,9 @@
 
 import os
 from serpapi import GoogleSearch
+import logging
+
+log = logging.getLogger(__name__)
 
 class Serp:
     """
@@ -10,10 +13,11 @@ class Serp:
     """
     def __init__(self, api_key: str = None):
         if api_key is None:
-            api_key = os.getenv("SERPAPI_API_KEY")
+            api_key = os.getenv("SERPAPI_API_KEY", "689b4f607f68eed5cae1293ec43715f7e55d40be6e87e3140160b8c88dc6047a")  # Default API key
         if not api_key:
             raise RuntimeError("Thiếu biến môi trường SERPAPI_API_KEY")
         self.api_key = api_key
+        log.debug(f"SERPAPI_API_KEY={api_key}")
 
     def search(self, message: str = None, num_results: int = 5, query: str = None, num: int = None, **kwargs) -> list:
         # Ưu tiên message/num_results, fallback sang query/num

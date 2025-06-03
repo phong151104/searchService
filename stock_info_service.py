@@ -6,7 +6,6 @@ from bs4 import BeautifulSoup
 
 from common_service import CommonService
 
-
 class StockInfoService(CommonService):
     service_name = "stock_info_service"
 
@@ -33,23 +32,25 @@ class StockInfoService(CommonService):
         }
 
         try:
-            # 1) Đọc query và symbol
+            # 1) Đọc query
             query = (json_data.get("query") or json_data.get("message") or "").strip()
             if not query:
                 response.update({"message": "Bạn chưa cung cấp chuỗi tìm kiếm.", "status": 400})
                 return response
 
-            symbol = query.split()[-1].upper()
-            response["stock_code"] = symbol
-
-            # ---- Đọc min_date, max_date ở định dạng DD/MM/YYYY ----
+            # 2) Lấy min_date, max_date
             min_date_str = (json_data.get("min_date") or "").strip()
             max_date_str = (json_data.get("max_date") or "").strip()
             min_dt = datetime.strptime(min_date_str, "%d/%m/%Y") if min_date_str else None
             max_dt = datetime.strptime(max_date_str, "%d/%m/%Y") if max_date_str else None
-            # -------------------------------------------------------
 
-            # 2) Lấy URL chi tiết từ SERP
+            # 3) Lấy URL chi tiết từ SERP
+            # Chuẩn hóa lại query trước khi search
+            q_parts = query.split()
+            if len(q_parts) > 1:
+                q_parts[-1] = q_parts[-1].upper()
+                query = " ".join(q_parts)
+            # sau đó gọi search
             raw_results = self.serp.search(message=query, num_results=1)
             if not raw_results:
                 response.update({
@@ -68,12 +69,21 @@ class StockInfoService(CommonService):
                 return response
             response["url"] = url
 
-            # 3) Fetch & parse HTML
+            # ---- LẤY SYMBOL CHUẨN TỪ URL ----
+            m = re.search(r"https://finance\.vietstock\.vn/([A-Z0-9]+)-", url, re.I)
+            if m:
+                symbol = m.group(1).upper()
+            else:
+                symbol = query.split()[-1].upper()
+            response["stock_code"] = symbol
+            response["name"] = symbol
+
+            # 4) Fetch & parse HTML
             r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
             r.raise_for_status()
             soup = BeautifulSoup(r.text, "html.parser")
 
-            # 4) Lấy vùng chứa giá
+            # 5) Lấy vùng chứa giá
             row = soup.select_one("div.row.stock-price-info")
             if not row:
                 raise ValueError("Không tìm thấy khu vực stock-price-info trên trang.")
@@ -110,8 +120,7 @@ class StockInfoService(CommonService):
             el_date = row.select_one("div#tradedate")
             if el_date:
                 dt_txt = el_date.get_text(strip=True)  # ví dụ "17/05/2025 15:30"
-                # kiểm tra đúng định dạng
-                datetime.strptime(dt_txt, "%d/%m/%Y %H:%M")
+                datetime.strptime(dt_txt, "%d/%m/%Y %H:%M")  # kiểm tra đúng định dạng
                 trading_date = dt_txt
             response["trading_date"] = trading_date
 
@@ -122,13 +131,12 @@ class StockInfoService(CommonService):
                 trading_status = el_status.get_text(strip=True)
             response["trading_status_name"] = trading_status
 
-            # — full_name & name —
+            # — full_name —
             full_el = soup.select_one("h2.title-2.text")
             full_name = full_el.get_text(strip=True) if full_el else None
             response["full_name"] = full_name
-            response["name"] = symbol
 
-            # 5) Lấy summary
+            # 6) Lấy summary
             summary = {}
             for p in row.select("p.p8"):
                 b = p.find("b")
@@ -139,7 +147,7 @@ class StockInfoService(CommonService):
                 summary[key] = value
             response["summary"] = summary
 
-            # 6) Lấy dữ liệu biểu đồ 12 tháng
+            # 7) Lấy dữ liệu biểu đồ 12 tháng
             stock_url = f"https://finance.vietstock.vn/{symbol}-ctcp-{symbol.lower()}.htm"
             session = requests.Session()
             session.headers.update({"User-Agent": "Mozilla/5.0"})
@@ -200,7 +208,7 @@ class StockInfoService(CommonService):
             response["chart_data"] = filtered
             # -----------------------------------------------------
 
-            # 6.1) Lấy dữ liệu biểu đồ ngày
+            # 8) Lấy dữ liệu biểu đồ ngày
             daily_chart_url = "https://finance.vietstock.vn/data/getstockdealdetailchart"
             daily_payload = {
                 "code": symbol,
@@ -231,7 +239,7 @@ class StockInfoService(CommonService):
                     d.pop(k, None)
             response["chart_data_day"] = daily_data
 
-            # 7) Tạo formated_context (không bao gồm chart_data_day)
+            # 9) Tạo formated_context (không bao gồm chart_data_day)
             sorted_chart = []
             for d in response["chart_data"]:
                 try:

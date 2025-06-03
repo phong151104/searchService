@@ -1,6 +1,6 @@
 # app.py
 import os
-os.environ['SERPAPI_API_KEY'] = 'e8e87504a12a592d143c4280e8ac79c15f4ee36f22e3dee07756b3853005c23a'
+os.environ['SERPAPI_API_KEY'] = '689b4f607f68eed5cae1293ec43715f7e55d40be6e87e3140160b8c88dc6047a'
 
 from flask import Flask, request, jsonify
 from service_factory import ServiceFactory
@@ -191,6 +191,30 @@ def google_image():
 def google_maps():
     app.logger.debug("\n\nInput: %s", request.json)
     service = ServiceFactory().get_google_maps_service()
+    response = service.process(json_data=request.json, log=app.logger)
+    app.logger.debug("Response: %s", response)
+    return jsonify(response), response.get("status", 200)
+
+@app.route("/search/investing-world-gold", methods=["POST"])
+def investing_world_gold():
+    app.logger.debug("\n\nInput: %s", request.json)
+    service = ServiceFactory().get_investing_world_gold_service()
+    response = service.process(json_data=request.json, log=app.logger)
+    app.logger.debug("Response: %s", response)
+    return jsonify(response), response.get("status", 200)
+
+@app.route("/search/weekday", methods=["POST"])
+def weekday():
+    app.logger.debug("\n\nInput: %s", request.json)
+    service = ServiceFactory().get_weekday_service()
+    response = service.process(json_data=request.json, log=app.logger)
+    app.logger.debug("Response: %s", response)
+    return jsonify(response), response.get("status", 200)
+
+@app.route("/search/vietstock-top-stock", methods=["POST"])
+def vietstock_top_stock():
+    app.logger.debug("\n\nInput: %s", request.json)
+    service = ServiceFactory().get_vietstock_top_stock_service()
     response = service.process(json_data=request.json, log=app.logger)
     app.logger.debug("Response: %s", response)
     return jsonify(response), response.get("status", 200)

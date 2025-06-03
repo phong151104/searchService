@@ -19,6 +19,9 @@ from tuvi_service import TuViService
 from google_image_service import GoogleImageService
 from cgv_now_showing_service import CGVNowShowingService
 from google_maps_service import GoogleMapsService
+from investing_world_gold_service import InvestingWorldGoldService
+from weekday_service import WeekdayService
+from vietstock_top_stock_service import VietstockTopStockService
 
 class ServiceFactory:
     def __init__(self):
@@ -151,6 +154,27 @@ class ServiceFactory:
         if key in self.dic:
             return self.dic[key]
         self.dic[key] = GoogleMapsService()
+        return self.dic[key]
+
+    def get_investing_world_gold_service(self) -> InvestingWorldGoldService:
+        key = InvestingWorldGoldService.service_name
+        if key in self.dic:
+            return self.dic[key]
+        self.dic[key] = InvestingWorldGoldService()
+        return self.dic[key]
+
+    def get_weekday_service(self) -> WeekdayService:
+        key = WeekdayService.service_name
+        if key in self.dic:
+            return self.dic[key]
+        self.dic[key] = WeekdayService()
+        return self.dic[key]
+
+    def get_vietstock_top_stock_service(self) -> VietstockTopStockService:
+        key = VietstockTopStockService.service_name
+        if key in self.dic:
+            return self.dic[key]
+        self.dic[key] = VietstockTopStockService()
         return self.dic[key]
 
     @staticmethod
